@@ -4,11 +4,17 @@ import QtQuick.Controls 1.1
 import QtQuick.Controls.Styles 1.3
 import QtQuick.Layouts 1.1
 
+/**********************
+/* ChangeLog:
+/*  - 1.0: Initial version
+/*  - 1.1.0: On opening the plugin, no need to reselect the current selection to activate the plugin's functions
+/**********************************************/
+
 MuseScore {
     menuPath: "Plugins.Annotations"
     description: "Allows adding annotations/comments to a score"
     pluginType: "dock"
-    version: "1.0"
+    version: "1.1.0"
     requiresScore: false
 
     property var activeScore: null; // Keep a reference to curScore to be able to detect switching scores
@@ -17,6 +23,7 @@ MuseScore {
 
     onRun: {
         loadCurScoreData();
+		analyseSelection();
     }
 
     onScoreStateChanged : {
@@ -34,52 +41,7 @@ MuseScore {
             }
 
             // Now check selected element
-            if (curScore) {
-                if (   curScore.selection
-                    && curScore.selection.elements
-                    && (curScore.selection.elements.length === 1)
-                ) {
-                    selectedElement = curScore.selection.elements[0];
-                    // Can we add a comment for this selection?
-                    commentablePositionSelected = (selectedElement.type === Element.NOTE)
-                                               || (selectedElement.type === Element.REST);
-                    // Did we select a possible comment ?
-                    if (selectedElement.type === Element.STAFF_TEXT) {
-                        if (selectedElement.text == '…') {
-                            //console.log('Candidate comment marker selected', selectedElement.parent.tick, selectedElement.track);
-                            // Try to find a matching comment
-                            for (var commentIdx = commentsModel.count; commentIdx-- > 0; ) {
-                                var commentItem = commentsModel.get(commentIdx);
-                                if (commentItem.staffTextRef && (commentItem.staffTextRef.is(selectedElement))) {
-                                    //console.log("Found this comment", commentIdx);
-                                    break;
-                                }
-                            }
-                            if (commentIdx === -1) {
-                                console.log("Matching comment not found");
-                            }
-                            commentsListView.currentIndex = commentIdx;
-                        }
-                        else { // Wrong text contents -> not a comment
-                            commentsListView.currentIndex = -1;
-                        }
-                    }
-                    else { // No STAFF_TEXT
-                        commentsListView.currentIndex = -1;
-                    }
-                }
-                else { // Did not select a single element
-                    selectedElement = null;
-                    commentablePositionSelected = false;
-                    commentsListView.currentIndex = -1;
-                }
-            }
-            else {
-                // No more score selected, so most certainly no element in it either
-                selectedElement = null;
-                commentablePositionSelected = false;
-                commentsModel.clear();
-            }
+			analyseSelection();
         }
     } //onScoreStateChanged
 
@@ -127,6 +89,50 @@ MuseScore {
         console.log("Restored", commentsModel.count, "comments");
     }
 
+	function analyseSelection() {
+	    if (curScore) {
+	        if (curScore.selection
+	             && curScore.selection.elements
+	             && (curScore.selection.elements.length === 1)) {
+	            selectedElement = curScore.selection.elements[0];
+	            // Can we add a comment for this selection?
+	            commentablePositionSelected = (selectedElement.type === Element.NOTE)
+	             || (selectedElement.type === Element.REST);
+	            // Did we select a possible comment ?
+	            if (selectedElement.type === Element.STAFF_TEXT) {
+	                if (selectedElement.text == '…') {
+	                    //console.log('Candidate comment marker selected', selectedElement.parent.tick, selectedElement.track);
+	                    // Try to find a matching comment
+	                    for (var commentIdx = commentsModel.count; commentIdx-- > 0; ) {
+	                        var commentItem = commentsModel.get(commentIdx);
+	                        if (commentItem.staffTextRef && (commentItem.staffTextRef.is(selectedElement))) {
+	                            //console.log("Found this comment", commentIdx);
+	                            break;
+	                        }
+	                    }
+	                    if (commentIdx === -1) {
+	                        console.log("Matching comment not found");
+	                    }
+	                    commentsListView.currentIndex = commentIdx;
+	                } else { // Wrong text contents -> not a comment
+	                    commentsListView.currentIndex = -1;
+	                }
+	            } else { // No STAFF_TEXT
+	                commentsListView.currentIndex = -1;
+	            }
+	        } else { // Did not select a single element
+	            selectedElement = null;
+	            commentablePositionSelected = false;
+	            commentsListView.currentIndex = -1;
+	        }
+	    } else {
+	        // No more score selected, so most certainly no element in it either
+	        selectedElement = null;
+	        commentablePositionSelected = false;
+	        commentsModel.clear();
+	    }
+
+	}
     function commentsToJSON() {
         var commentsArray = [];
         for (var commentIdx = 0; commentIdx < commentsModel.count; ++commentIdx) {
